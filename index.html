@@ -1,0 +1,691 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>7월 일정 조율 — 2026</title>
+
+  <!-- Firebase v9 compat -->
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #f8f7f4;
+      --surface: #ffffff;
+      --border: rgba(0,0,0,0.10);
+      --border-md: rgba(0,0,0,0.18);
+      --text: #1a1a1a;
+      --text-2: #6b6b6b;
+      --text-3: #a0a0a0;
+      --radius: 12px;
+      --radius-sm: 8px;
+      --shadow: 0 1px 4px rgba(0,0,0,0.06), 0 4px 16px rgba(0,0,0,0.04);
+      --blue: #3b82f6;
+      --blue-bg: #eff6ff;
+      --blue-text: #1d4ed8;
+      --green: #16a34a;
+      --green-bg: #f0fdf4;
+      --green-border: #bbf7d0;
+      --green-text: #15803d;
+      --red-bg: #fff1f2;
+      --red-text: #be123c;
+
+      /* member badge colors */
+      --m0-bg: #ede9fe; --m0-text: #4c1d95;
+      --m1-bg: #dbeafe; --m1-text: #1e40af;
+      --m2-bg: #d1fae5; --m2-text: #065f46;
+      --m3-bg: #fce7f3; --m3-text: #831843;
+    }
+
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg: #111110;
+        --surface: #1c1c1a;
+        --border: rgba(255,255,255,0.10);
+        --border-md: rgba(255,255,255,0.18);
+        --text: #f0efe9;
+        --text-2: #999896;
+        --text-3: #666462;
+        --blue-bg: #172554;
+        --blue-text: #93c5fd;
+        --green-bg: #052e16;
+        --green-border: #166534;
+        --green-text: #86efac;
+        --red-bg: #1f0a0e;
+        --red-text: #fda4af;
+        --m0-bg: #2e1065; --m0-text: #c4b5fd;
+        --m1-bg: #1e3a8a; --m1-text: #93c5fd;
+        --m2-bg: #022c22; --m2-text: #6ee7b7;
+        --m3-bg: #500724; --m3-text: #fbcfe8;
+      }
+    }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Pretendard', 'Apple SD Gothic Neo', 'Noto Sans KR', system-ui, sans-serif;
+      font-size: 15px;
+      line-height: 1.5;
+      min-height: 100vh;
+    }
+
+    /* ── LOGIN ── */
+    #loginScreen {
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 2rem;
+    }
+    .login-card {
+      background: var(--surface);
+      border: 0.5px solid var(--border);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      padding: 2.5rem 2rem;
+      width: 100%;
+      max-width: 340px;
+      display: flex;
+      flex-direction: column;
+      gap: 1.25rem;
+    }
+    .login-icon {
+      width: 48px; height: 48px;
+      background: var(--blue-bg);
+      border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 22px;
+      margin: 0 auto;
+    }
+    .login-title { text-align: center; font-size: 17px; font-weight: 600; }
+    .login-sub   { text-align: center; font-size: 13px; color: var(--text-2); margin-top: -0.75rem; }
+    .field label { font-size: 12px; font-weight: 500; color: var(--text-2); display: block; margin-bottom: 5px; }
+    .field input {
+      width: 100%;
+      padding: 10px 14px;
+      border: 0.5px solid var(--border-md);
+      border-radius: var(--radius-sm);
+      background: var(--bg);
+      color: var(--text);
+      font-size: 15px;
+      outline: none;
+      transition: border-color 0.15s;
+    }
+    .field input:focus { border-color: var(--blue); }
+    .btn-primary {
+      width: 100%;
+      padding: 11px;
+      background: var(--blue);
+      color: #fff;
+      border: none;
+      border-radius: var(--radius-sm);
+      font-size: 15px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: opacity 0.15s;
+    }
+    .btn-primary:hover { opacity: 0.88; }
+    .err-msg {
+      font-size: 12px;
+      color: var(--red-text);
+      background: var(--red-bg);
+      border-radius: var(--radius-sm);
+      padding: 8px 12px;
+      text-align: center;
+      display: none;
+    }
+
+    /* ── MAIN ── */
+    #mainScreen { display: none; }
+    .topbar {
+      position: sticky; top: 0; z-index: 10;
+      background: var(--surface);
+      border-bottom: 0.5px solid var(--border);
+      padding: 12px 1.25rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+    }
+    .topbar-left { display: flex; align-items: center; gap: 10px; }
+    .topbar-icon { font-size: 20px; }
+    .topbar-title { font-size: 15px; font-weight: 600; }
+    .topbar-sub { font-size: 12px; color: var(--text-2); }
+    .btn-logout {
+      font-size: 12px; color: var(--text-2);
+      background: none; border: 0.5px solid var(--border-md);
+      border-radius: 20px; padding: 5px 12px;
+      cursor: pointer; display: flex; align-items: center; gap: 5px;
+      transition: background 0.15s;
+    }
+    .btn-logout:hover { background: var(--bg); }
+
+    .container { padding: 1.25rem; max-width: 720px; margin: 0 auto; }
+
+    /* member tabs */
+    .tabs-label { font-size: 12px; font-weight: 500; color: var(--text-2); margin-bottom: 8px; }
+    .tabs { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 1.5rem; }
+    .tab {
+      padding: 7px 16px;
+      border-radius: 20px;
+      border: 0.5px solid var(--border-md);
+      background: transparent;
+      color: var(--text-2);
+      font-size: 13px;
+      cursor: pointer;
+      transition: all 0.15s;
+      font-weight: 500;
+    }
+    .tab:hover:not(.active) { background: var(--bg); }
+    .tab.active { color: #fff; border-color: transparent; }
+    .tab[data-i="0"].active { background: #7c3aed; }
+    .tab[data-i="1"].active { background: #2563eb; }
+    .tab[data-i="2"].active { background: #059669; }
+    .tab[data-i="3"].active { background: #db2777; }
+
+    /* calendar */
+    .cal-wrap {
+      background: var(--surface);
+      border: 0.5px solid var(--border);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      overflow: hidden;
+      margin-bottom: 1rem;
+    }
+    .cal-head {
+      display: grid; grid-template-columns: repeat(7, 1fr);
+      background: var(--bg);
+      border-bottom: 0.5px solid var(--border);
+    }
+    .dow {
+      padding: 8px 0;
+      text-align: center;
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      color: var(--text-2);
+    }
+    .dow.w { color: var(--red-text); }
+    .cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); }
+
+    .cell {
+      border-right: 0.5px solid var(--border);
+      border-bottom: 0.5px solid var(--border);
+      min-height: 82px;
+      padding: 7px 6px 6px;
+      position: relative;
+      transition: background 0.12s;
+    }
+    .cell:nth-child(7n) { border-right: none; }
+    .cell.empty { background: var(--bg); }
+    .cell.wknd {
+      background: var(--bg);
+      opacity: 0.5;
+      pointer-events: none;
+    }
+    .cell.after15 {
+      background: var(--bg);
+      pointer-events: none;
+    }
+    .cell.selectable { cursor: pointer; }
+    .cell.selectable:hover { background: var(--blue-bg); }
+    .cell.mine { background: var(--green-bg); }
+    .cell.mine:hover { background: #dcfce7; }
+
+    .cell-date {
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--text);
+      margin-bottom: 3px;
+    }
+    .cell.wknd   .cell-date { color: var(--red-text); }
+    .cell.after15 .cell-date { color: var(--text-3); }
+    .cell-dow-label {
+      font-size: 9px;
+      color: var(--text-3);
+      font-weight: 500;
+      letter-spacing: 0.03em;
+      margin-bottom: 3px;
+    }
+
+    .check-mark {
+      position: absolute;
+      top: 5px; right: 6px;
+      font-size: 13px;
+      color: var(--green);
+      display: none;
+    }
+    .cell.mine .check-mark { display: block; }
+
+    .badges { display: flex; flex-wrap: wrap; gap: 3px; margin-top: 2px; }
+    .badge {
+      font-size: 10px;
+      font-weight: 600;
+      padding: 1px 5px;
+      border-radius: 10px;
+    }
+    .badge[data-i="0"] { background: var(--m0-bg); color: var(--m0-text); }
+    .badge[data-i="1"] { background: var(--m1-bg); color: var(--m1-text); }
+    .badge[data-i="2"] { background: var(--m2-bg); color: var(--m2-text); }
+    .badge[data-i="3"] { background: var(--m3-bg); color: var(--m3-text); }
+
+    /* legend */
+    .legend {
+      display: flex; gap: 14px; flex-wrap: wrap;
+      margin-bottom: 1.5rem;
+    }
+    .legend-item {
+      display: flex; align-items: center; gap: 6px;
+      font-size: 12px; color: var(--text-2);
+    }
+    .legend-dot { width: 9px; height: 9px; border-radius: 50%; }
+
+    /* summary */
+    .summary-card {
+      background: var(--surface);
+      border: 0.5px solid var(--border);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      padding: 1.25rem;
+      margin-bottom: 1rem;
+    }
+    .summary-title {
+      font-size: 13px; font-weight: 600;
+      color: var(--text);
+      margin-bottom: 0.75rem;
+      display: flex; align-items: center; gap: 6px;
+    }
+    .summary-row {
+      display: flex; align-items: baseline;
+      gap: 10px; padding: 5px 0;
+      border-bottom: 0.5px solid var(--border);
+      font-size: 13px;
+    }
+    .summary-row:last-child { border-bottom: none; }
+    .s-name {
+      min-width: 64px;
+      font-weight: 600;
+      font-size: 12px;
+    }
+    .s-dates { color: var(--text-2); font-size: 12px; line-height: 1.6; }
+    .all-ok {
+      margin-top: 0.75rem;
+      padding: 8px 12px;
+      background: var(--green-bg);
+      border: 0.5px solid var(--green-border);
+      border-radius: var(--radius-sm);
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--green-text);
+      display: flex; align-items: center; gap: 6px;
+    }
+
+    /* sync status */
+    .sync-bar {
+      font-size: 11px;
+      color: var(--text-3);
+      display: flex; align-items: center; gap: 5px;
+      margin-bottom: 0.75rem;
+    }
+    .sync-dot {
+      width: 6px; height: 6px; border-radius: 50%;
+      background: var(--text-3);
+    }
+    .sync-dot.ok  { background: var(--green); }
+    .sync-dot.err { background: var(--red-text); }
+
+    /* loading overlay */
+    #loadingOverlay {
+      position: fixed; inset: 0; z-index: 99;
+      background: var(--bg);
+      display: flex; align-items: center; justify-content: center;
+      flex-direction: column; gap: 12px;
+      font-size: 13px; color: var(--text-2);
+    }
+    .spinner {
+      width: 28px; height: 28px;
+      border: 2px solid var(--border-md);
+      border-top-color: var(--blue);
+      border-radius: 50%;
+      animation: spin 0.7s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    @media (max-width: 480px) {
+      .cell { min-height: 68px; padding: 5px 4px; }
+      .cell-date { font-size: 12px; }
+      .badge { font-size: 9px; padding: 1px 4px; }
+      .container { padding: 1rem 0.75rem; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- Loading -->
+<div id="loadingOverlay">
+  <div class="spinner"></div>
+  <span>연결 중...</span>
+</div>
+
+<!-- Login -->
+<div id="loginScreen" style="display:none;">
+  <div class="login-card">
+    <div class="login-icon">📅</div>
+    <div class="login-title">7월 일정 조율</div>
+    <div class="login-sub">가능한 날짜를 함께 확인해요</div>
+    <div class="field">
+      <label>이름 선택</label>
+      <select id="nameSelect" style="width:100%;padding:10px 14px;border:0.5px solid var(--border-md);border-radius:var(--radius-sm);background:var(--bg);color:var(--text);font-size:15px;outline:none;cursor:pointer;">
+        <option value="">-- 이름을 선택하세요 --</option>
+        <option>김기태</option>
+        <option>김성훈</option>
+        <option>서거정</option>
+        <option>이승환</option>
+      </select>
+    </div>
+    <div class="field">
+      <label>비밀번호</label>
+      <input type="password" id="pwInput" placeholder="비밀번호 입력" autocomplete="off" onkeydown="if(event.key==='Enter')tryLogin()" />
+    </div>
+    <button class="btn-primary" onclick="tryLogin()">입장하기</button>
+    <div class="err-msg" id="errMsg"></div>
+  </div>
+</div>
+
+<!-- Main App -->
+<div id="mainScreen">
+  <div class="topbar">
+    <div class="topbar-left">
+      <span class="topbar-icon">📅</span>
+      <div>
+        <div class="topbar-title">7월 일정 조율 2026</div>
+        <div class="topbar-sub" id="topbarSub"></div>
+      </div>
+    </div>
+    <button class="btn-logout" onclick="logout()">
+      <span>↩</span> 나가기
+    </button>
+  </div>
+
+  <div class="container">
+
+    <div class="sync-bar">
+      <div class="sync-dot" id="syncDot"></div>
+      <span id="syncLabel">Firebase 연결 중...</span>
+    </div>
+
+    <div class="tabs-label">내 이름을 선택하고 가능한 날짜를 클릭하세요</div>
+    <div class="tabs" id="tabs"></div>
+
+    <div class="cal-wrap">
+      <div class="cal-head">
+        <div class="dow">월</div>
+        <div class="dow">화</div>
+        <div class="dow">수</div>
+        <div class="dow">목</div>
+        <div class="dow w">금</div>
+        <div class="dow w">토</div>
+        <div class="dow w">일</div>
+      </div>
+      <div class="cal-grid" id="calGrid"></div>
+    </div>
+
+    <div class="legend">
+      <div class="legend-item"><div class="legend-dot" style="background:var(--green);"></div> 내가 선택함</div>
+      <div class="legend-item"><div class="legend-dot" style="background:var(--text-3);"></div> 주말 / 16일 이후 (선택 불가)</div>
+    </div>
+
+    <div class="summary-card" id="summaryCard"></div>
+  </div>
+</div>
+
+<script>
+// ════════════════════════════════════════════════
+//  🔧 Firebase 설정 — 본인 프로젝트 값으로 교체하세요
+// ════════════════════════════════════════════════
+// Import the functions you need from the SDKs you need
+import { initializeApp } from "firebase/app";
+// TODO: Add SDKs for Firebase products that you want to use
+// https://firebase.google.com/docs/web/setup#available-libraries
+
+// Your web app's Firebase configuration
+const firebaseConfig = {
+  apiKey: "AIzaSyAB5fTBWJJQm7w51zKXPG4CB7mZ3cu3dWk",
+  authDomain: "farewell-ad69b.firebaseapp.com",
+  projectId: "farewell-ad69b",
+  storageBucket: "farewell-ad69b.firebasestorage.app",
+  messagingSenderId: "496107519895",
+  appId: "1:496107519895:web:51fe12dd42b8027c12ced2"
+};
+
+// Initialize Firebase
+const app = initializeApp(firebaseConfig);
+};
+
+const PASSWORD = "3333";
+const MEMBERS  = ["김기태","김성훈","서거정","이승환"];
+const DOW_KO   = ["일","월","화","수","목","금","토"];
+
+// state
+let currentMember = null;
+let availability  = {};   // { memberName: Set<number> }
+MEMBERS.forEach(m => availability[m] = new Set());
+
+let db = null;
+let unsubscribe = null;
+
+// ── Firebase init ──────────────────────────────
+function initFirebase() {
+  try {
+    firebase.initializeApp(FIREBASE_CONFIG);
+    db = firebase.firestore();
+    setSyncStatus(true);
+    subscribeRealtime();
+  } catch(e) {
+    setSyncStatus(false);
+    console.warn("Firebase init failed:", e);
+  }
+}
+
+function setSyncStatus(ok) {
+  const dot   = document.getElementById("syncDot");
+  const label = document.getElementById("syncLabel");
+  if (ok) {
+    dot.className   = "sync-dot ok";
+    label.textContent = "실시간 동기화 중";
+  } else {
+    dot.className   = "sync-dot err";
+    label.textContent = "오프라인 (로컬 저장)";
+  }
+}
+
+function subscribeRealtime() {
+  if (!db) return;
+  if (unsubscribe) unsubscribe();
+  unsubscribe = db.collection("availability2026july")
+    .onSnapshot(snap => {
+      MEMBERS.forEach(m => availability[m] = new Set());
+      snap.forEach(doc => {
+        const data = doc.data();
+        if (MEMBERS.includes(doc.id) && Array.isArray(data.days)) {
+          availability[doc.id] = new Set(data.days);
+        }
+      });
+      renderCalendar();
+      renderSummary();
+    }, err => {
+      setSyncStatus(false);
+      console.warn("Firestore error:", err);
+    });
+}
+
+async function saveToFirebase(member) {
+  if (!db) return;
+  try {
+    const days = [...availability[member]].sort((a,b)=>a-b);
+    await db.collection("availability2026july").doc(member).set({ days });
+  } catch(e) {
+    setSyncStatus(false);
+    console.warn("Save failed:", e);
+  }
+}
+
+// ── Auth ───────────────────────────────────────
+function tryLogin() {
+  const name = document.getElementById("nameSelect").value;
+  const pw   = document.getElementById("pwInput").value;
+  const err  = document.getElementById("errMsg");
+
+  if (!name) { showErr("이름을 선택해주세요."); return; }
+  if (pw !== PASSWORD) { showErr("비밀번호가 올바르지 않습니다."); return; }
+
+  currentMember = name;
+  err.style.display = "none";
+  document.getElementById("loginScreen").style.display = "none";
+  document.getElementById("mainScreen").style.display  = "block";
+  document.getElementById("topbarSub").textContent = name + "님 접속 중";
+
+  renderTabs();
+  renderCalendar();
+  renderSummary();
+}
+
+function showErr(msg) {
+  const el = document.getElementById("errMsg");
+  el.textContent    = msg;
+  el.style.display  = "block";
+}
+
+function logout() {
+  currentMember = null;
+  document.getElementById("mainScreen").style.display  = "none";
+  document.getElementById("loginScreen").style.display = "flex";
+  document.getElementById("pwInput").value = "";
+  document.getElementById("nameSelect").value = "";
+  document.getElementById("errMsg").style.display = "none";
+}
+
+// ── Tabs ───────────────────────────────────────
+function renderTabs() {
+  const el = document.getElementById("tabs");
+  el.innerHTML = MEMBERS.map((m, i) =>
+    `<button class="tab${m===currentMember?' active':''}" data-i="${i}" onclick="selectMember('${m}')">${m}</button>`
+  ).join("");
+}
+
+function selectMember(name) {
+  currentMember = name;
+  document.getElementById("topbarSub").textContent = name + "님 접속 중";
+  renderTabs();
+  renderCalendar();
+}
+
+// ── Calendar ───────────────────────────────────
+function renderCalendar() {
+  const grid = document.getElementById("calGrid");
+  grid.innerHTML = "";
+
+  // July 1 2026 = Wednesday → dow index 3 → mondayOffset = 2
+  const july1Dow   = new Date(2026, 6, 1).getDay(); // 3 = Wed
+  const offset     = july1Dow === 0 ? 6 : july1Dow - 1; // Mon-based offset
+
+  for (let i = 0; i < offset; i++) {
+    const el = document.createElement("div");
+    el.className = "cell empty";
+    grid.appendChild(el);
+  }
+
+  for (let d = 1; d <= 31; d++) {
+    const date = new Date(2026, 6, d);
+    const dow  = date.getDay(); // 0=Sun
+    const isWeekend    = dow === 0 || dow === 6 || dow === 5;
+    const isAfter15    = d > 15;
+    const isSelectable = !isWeekend && !isAfter15;
+
+    const iMine        = isSelectable && availability[currentMember]?.has(d);
+    const membersOn    = MEMBERS.filter(m => availability[m].has(d));
+
+    const cell = document.createElement("div");
+    let cls = "cell";
+    if      (isWeekend)    cls += " wknd";
+    else if (isAfter15)    cls += " after15";
+    else if (iMine)        cls += " selectable mine";
+    else if (isSelectable) cls += " selectable";
+
+    cell.className = cls;
+    if (isSelectable) cell.onclick = () => toggleDate(d);
+
+    // dow label for Fri/Sat/Sun
+    let dowLabel = "";
+    if (isWeekend) dowLabel = `<div class="cell-dow-label">${DOW_KO[dow]}</div>`;
+
+    const badges = membersOn.map(m => {
+      const idx = MEMBERS.indexOf(m);
+      return `<span class="badge" data-i="${idx}">${m.slice(1)}</span>`;
+    }).join("");
+
+    cell.innerHTML = `
+      <div class="cell-date">${d}</div>
+      ${dowLabel}
+      <span class="check-mark">✓</span>
+      <div class="badges">${badges}</div>
+    `;
+    grid.appendChild(cell);
+  }
+}
+
+async function toggleDate(d) {
+  if (!currentMember) return;
+  const s = availability[currentMember];
+  if (s.has(d)) s.delete(d);
+  else           s.add(d);
+  renderCalendar();
+  renderSummary();
+  await saveToFirebase(currentMember);
+}
+
+// ── Summary ────────────────────────────────────
+function renderSummary() {
+  const el = document.getElementById("summaryCard");
+
+  const rows = MEMBERS.map((m, i) => {
+    const days = [...availability[m]].sort((a,b)=>a-b);
+    const txt  = days.length ? days.map(d=>d+"일").join(", ") : "선택 없음";
+    const color = ["#7c3aed","#2563eb","#059669","#db2777"][i];
+    return `<div class="summary-row">
+      <span class="s-name" style="color:${color};">${m}</span>
+      <span class="s-dates">${txt}</span>
+    </div>`;
+  }).join("");
+
+  const selectableDays = Array.from({length:15}, (_,i)=>i+1)
+    .filter(d => { const dow = new Date(2026,6,d).getDay(); return dow!==0 && dow!==5 && dow!==6; });
+
+  const allDays = selectableDays.filter(d => MEMBERS.every(m => availability[m].has(d)));
+  const allOk = allDays.length
+    ? `<div class="all-ok">⭐ 전원 가능한 날짜: ${allDays.map(d=>d+"일").join(", ")}</div>`
+    : "";
+
+  el.innerHTML = `
+    <div class="summary-title">📋 멤버별 가용 현황</div>
+    ${rows}
+    ${allOk}
+  `;
+}
+
+// ── Boot ───────────────────────────────────────
+window.addEventListener("DOMContentLoaded", () => {
+  const overlay = document.getElementById("loadingOverlay");
+  initFirebase();
+  setTimeout(() => {
+    overlay.style.display = "none";
+    document.getElementById("loginScreen").style.display = "flex";
+  }, 900);
+});
+</script>
+</body>
+</html>
